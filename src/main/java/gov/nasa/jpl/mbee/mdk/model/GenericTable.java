@@ -6,18 +6,18 @@ import com.nomagic.magicdraw.dependencymatrix.configuration.MatrixDataHelper;
 import com.nomagic.magicdraw.dependencymatrix.datamodel.MatrixData;
 import com.nomagic.magicdraw.dependencymatrix.datamodel.cell.AbstractMatrixCell;
 import com.nomagic.magicdraw.properties.*;
+import com.nomagic.magicdraw.properties.Property;
+import com.nomagic.magicdraw.properties.ui.ObjectListProperty;
 import com.nomagic.magicdraw.uml.DiagramType;
 import com.nomagic.uml2.ext.jmi.helpers.ModelHelper;
-import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.Diagram;
-import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.Element;
-import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.InstanceSpecification;
-import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.NamedElement;
+import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.*;
 import gov.nasa.jpl.mbee.mdk.docgen.DocGenProfile;
 import gov.nasa.jpl.mbee.mdk.docgen.docbook.*;
 import gov.nasa.jpl.mbee.mdk.util.DependencyMatrixTool;
 import gov.nasa.jpl.mbee.mdk.util.GeneratorUtils;
 import gov.nasa.jpl.mbee.mdk.util.MatrixUtil;
 import gov.nasa.jpl.mbee.mdk.util.Utils;
+import org.jfree.util.ObjectList;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -229,7 +229,17 @@ public class GenericTable extends Table {
                 }
                 else if (cellValue instanceof ElementListProperty) {
                     for (Element listEl : ((ElementListProperty) cellValue).getValue()) {
-                        if (listEl instanceof NamedElement) {
+                        if(listEl instanceof LiteralString){
+                            entry.addElement(new DBParagraph(((LiteralString) listEl).getValue(), listEl, From.DVALUE));
+                        }else if(listEl instanceof LiteralReal){
+                            entry.addElement(new DBParagraph(((LiteralReal) listEl).getValue(), listEl, From.DVALUE));
+                        }else if(listEl instanceof LiteralBoolean){
+                            entry.addElement(new DBParagraph(((LiteralBoolean) listEl).isValue(), listEl, From.DVALUE));
+                        } else if(listEl instanceof LiteralInteger){
+                            entry.addElement(new DBParagraph(((LiteralInteger) listEl).getValue(), listEl, From.DVALUE));
+//                        }else if (listEl instanceof  Property) {
+//                            Object val = ((Property) listEl).getValue(); // Get default value and append it to the name (propName = defaultVal)
+                        }else if (listEl instanceof NamedElement) {
                             entry.addElement(new DBParagraph(((NamedElement) listEl).getName(), listEl, From.NAME));
                         }
                     }
@@ -259,6 +269,8 @@ public class GenericTable extends Table {
                             }
                         }
                     }
+                }else if(cellValue instanceof ObjectListProperty){
+                    entry.addElement(new DBParagraph( ((ObjectListProperty) cellValue).getValueStringRepresentation()));
                 }
                 else {
                     Application.getInstance().getGUILog().log("[WARNING] Cell value omitted: " + cellValue.toString() + ".");

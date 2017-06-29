@@ -9,6 +9,7 @@ import com.nomagic.magicdraw.properties.*;
 import com.nomagic.magicdraw.properties.Property;
 import com.nomagic.magicdraw.properties.ui.ObjectListProperty;
 import com.nomagic.magicdraw.uml.DiagramType;
+import com.nomagic.magicdraw.uml.symbols.DiagramPresentationElement;
 import com.nomagic.uml2.ext.jmi.helpers.ModelHelper;
 import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.*;
 import gov.nasa.jpl.mbee.mdk.docgen.DocGenProfile;
@@ -52,17 +53,19 @@ public class GenericTable extends Table {
         for (Object e : targets) {
             if (e instanceof Diagram) {
                 Diagram diagram = (Diagram) e;
-                DiagramType diagramType = Application.getInstance().getProject().getDiagram(diagram).getDiagramType();
+                DiagramPresentationElement diagramPE = Application.getInstance().getProject().getDiagram(diagram);
+                diagramPE.open();
+                 DiagramType diagramType = Application.getInstance().getProject().getDiagram(diagram).getDiagramType();
                 if (diagramType.isTypeOf(DiagramType.GENERIC_TABLE) || diagramType.getType().equals(INSTANCE_TABLE) || diagramType.getType().equals(REQUIREMENTS_TABLE)) {
                     DBTable t = new DBTable();
-                    List<String> columnIds = GenericTableManager.getVisibleColumnIds(diagram);
+                     List<String> columnIds = GenericTableManager.getVisibleColumnIds(diagram);
                     t.setHeaders(getHeaders(diagram, columnIds, false));
                     List<Element> rowElements = null;
-                    try {
-                        rowElements = GenericTableManager.getVisibleRowElements(diagram);
-                    }catch(NullPointerException np){
+//                    try {
+//                        rowElements = GenericTableManager.getVisibleRowElements(diagram);
+//                    }catch(NullPointerException np){
                         rowElements = GenericTableManager.getRowElements(diagram);
-                    }
+//                    }
                     t.setBody(getBody(diagram, rowElements, columnIds, forViewEditor));
                     if (getTitles() != null && getTitles().size() > tableCount) {
                         t.setTitle(getTitlePrefix() + getTitles().get(tableCount) + getTitleSuffix());
@@ -145,6 +148,7 @@ public class GenericTable extends Table {
                     t.setStyle(getStyle());
                     tableCount++;
                 }
+                diagramPE.close();
             }
         }
 
@@ -179,7 +183,11 @@ public class GenericTable extends Table {
                         continue;
                     }
                     if (!skipColumnIds.contains(columnId)) {
-                        row.add(new DBText(GenericTableManager.getColumnNameById(genericTable, columnId)));
+                        try {
+                            row.add(new DBText(GenericTableManager.getColumnNameById(genericTable, columnId)));
+                        }catch(NullPointerException npe){
+                            row.add(new DBText(columnId));
+                        }
                         numCols++;
                     }
                 }

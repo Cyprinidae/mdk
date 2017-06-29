@@ -238,15 +238,17 @@ public class GenericTable extends Table {
                 else if (cellValue instanceof ElementListProperty) {
                     for (Element listEl : ((ElementListProperty) cellValue).getValue()) {
                         if(listEl instanceof LiteralString){
-                            entry.addElement(new DBParagraph(((LiteralString) listEl).getValue(), listEl, From.DVALUE));
+                            entry.addElement(new DBParagraph(((LiteralString) listEl).getValue()));
                         }else if(listEl instanceof LiteralReal){
-                            entry.addElement(new DBParagraph(((LiteralReal) listEl).getValue(), listEl, From.DVALUE));
+                            entry.addElement(new DBParagraph(((LiteralReal) listEl).getValue()));
                         }else if(listEl instanceof LiteralBoolean){
-                            entry.addElement(new DBParagraph(((LiteralBoolean) listEl).isValue(), listEl, From.DVALUE));
+                            entry.addElement(new DBParagraph(((LiteralBoolean) listEl).isValue()));
                         } else if(listEl instanceof LiteralInteger){
-                            entry.addElement(new DBParagraph(((LiteralInteger) listEl).getValue(), listEl, From.DVALUE));
+                            entry.addElement(new DBParagraph(((LiteralInteger) listEl).getValue()));
 //                        }else if (listEl instanceof  Property) {
 //                            Object val = ((Property) listEl).getValue(); // Get default value and append it to the name (propName = defaultVal)
+                        }else if(listEl instanceof ValueSpecification){
+                            entry.addElement(new DBParagraph(((ValueSpecification) listEl).getType()+ ""));
                         }else if (listEl instanceof NamedElement) {
                             entry.addElement(new DBParagraph(((NamedElement) listEl).getName(), listEl, From.NAME));
                         }

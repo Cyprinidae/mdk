@@ -7,8 +7,10 @@ import com.nomagic.magicdraw.core.Application;
 import com.nomagic.magicdraw.core.Project;
 import com.nomagic.magicdraw.core.project.ProjectDescriptor;
 import com.nomagic.magicdraw.esi.EsiUtils;
+import com.nomagic.magicdraw.openapi.uml.SessionManager;
 import com.nomagic.magicdraw.teamwork2.ITeamworkService;
 import com.nomagic.magicdraw.teamwork2.ServerLoginInfo;
+import com.nomagic.task.EmptyProgressStatus;
 import com.nomagic.uml2.ext.magicdraw.classes.mdkernel.Element;
 import gov.nasa.jpl.mbee.mdk.api.MDKHelper;
 import gov.nasa.jpl.mbee.mdk.api.incubating.MDKConstants;
@@ -17,7 +19,13 @@ import gov.nasa.jpl.mbee.mdk.http.ServerException;
 import gov.nasa.jpl.mbee.mdk.json.JacksonUtils;
 import gov.nasa.jpl.mbee.mdk.mms.MMSUtils;
 import gov.nasa.jpl.mbee.mdk.mms.actions.MMSLoginAction;
+import gov.nasa.jpl.mbee.mdk.mms.sync.delta.DeltaSyncRunner;
+import gov.nasa.jpl.mbee.mdk.mms.sync.delta.SyncElement;
+import gov.nasa.jpl.mbee.mdk.mms.sync.delta.SyncElements;
+import gov.nasa.jpl.mbee.mdk.mms.sync.local.LocalDeltaProjectEventListenerAdapter;
+import gov.nasa.jpl.mbee.mdk.mms.sync.local.LocalDeltaTransactionCommitListener;
 import gov.nasa.jpl.mbee.mdk.options.MDKOptionsGroup;
+import gov.nasa.jpl.mbee.mdk.util.Changelog;
 import gov.nasa.jpl.mbee.mdk.util.TaskRunner;
 import gov.nasa.jpl.mbee.mdk.util.TicketUtils;
 import org.apache.commons.cli.*;
@@ -33,6 +41,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URISyntaxException;
 import java.rmi.RemoteException;
+import java.text.NumberFormat;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -128,8 +137,43 @@ public class AutomatedViewGenerator implements CommandLineAction {
             // open project
             loadTeamworkProject();
 
+            DeltaSyncRunner preDeltaSyncRunner = new DeltaSyncRunner(false, false, true);
+            preDeltaSyncRunner.run(EmptyProgressStatus.getDefault());
+            if (preDeltaSyncRunner.isFailure()) {
+                System.out.println("[WARNING] Failed to update from MMS prior to generating views. DocGen activities that depend on element values, like Simulate, may generate stale results.");
+            }
+            else {
+                System.out.println("[INFO] Updated " + NumberFormat.getInstance().format(preDeltaSyncRunner.getSuccessfulMmsChangelog().flattenedSize()) + " elements from MMS prior to generating views.");
+            }
+
             // generate views and commit images
             generateViews();
+
+            if (!preDeltaSyncRunner.isFailure()) {
+                // Only want to commit changes as a result of the view generation. This is the easiest way to clear out persisted local changes that failed to sync previously.
+                if (!SessionManager.getInstance().isSessionCreated(project)) {
+                    SessionManager.getInstance().createSession(project, "Clear Persisted Local Changelog");
+                }
+                SyncElements.setByType(project, SyncElement.Type.LOCAL, JacksonUtils.getObjectMapper().writeValueAsString(SyncElements.buildJson(new Changelog<>())));
+                if (SessionManager.getInstance().isSessionCreated(project)) {
+                    SessionManager.getInstance().closeSession();
+                }
+
+                LocalDeltaTransactionCommitListener listener = LocalDeltaProjectEventListenerAdapter.getProjectMapping(project).getLocalDeltaTransactionCommitListener();
+                if (listener == null) {
+                    System.out.println("[WARNING] Skipping commit to MMS after generating views due to illegal state. DocGen activities that depend on element values, like Simulate, may generate stale results.");
+                }
+                if (listener != null && !listener.getInMemoryLocalChangelog().isEmpty()) {
+                    DeltaSyncRunner postDeltaSyncRunner = new DeltaSyncRunner(true, true, false);
+                    postDeltaSyncRunner.run(EmptyProgressStatus.getDefault());
+                    if (postDeltaSyncRunner.isFailure()) {
+                        System.out.println("[WARNING] Failed to commit to MMS after generating views. DocGen activities that depend on element values, like Simulate, may generate stale results.");
+                    }
+                    else {
+                        System.out.println("[INFO] Committed " + NumberFormat.getInstance().format(postDeltaSyncRunner.getSuccessfulMmsChangelog().flattenedSize()) + " elements to MMS after generating views.");
+                    }
+                }
+            }
 
             // logout in finally
         } catch (Error err) {
